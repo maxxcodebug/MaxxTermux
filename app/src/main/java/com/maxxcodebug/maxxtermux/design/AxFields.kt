@@ -79,7 +79,7 @@ fun AxField(
 }
 
 @Composable
-fun AxChoiceChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun AxChoiceChip(text: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(
         modifier
             .clip(AxShapes.Chip)
