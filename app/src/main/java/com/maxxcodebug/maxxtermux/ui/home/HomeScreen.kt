@@ -3,6 +3,7 @@ package com.maxxcodebug.maxxtermux.ui.home
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,7 +12,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,46 +25,55 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Memory
-import androidx.compose.material.icons.rounded.Notifications
-import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.maxxcodebug.maxxtermux.build.BuildTracker
+import com.maxxcodebug.maxxtermux.design.AxButton
+import com.maxxcodebug.maxxtermux.design.AxButtonKind
 import com.maxxcodebug.maxxtermux.design.AxColors
-import com.maxxcodebug.maxxtermux.design.AxGlassDock
 import com.maxxcodebug.maxxtermux.design.AxIcon
 import com.maxxcodebug.maxxtermux.design.AxProgress
 import com.maxxcodebug.maxxtermux.design.AxShapes
-import com.maxxcodebug.maxxtermux.design.AxTab
 import com.maxxcodebug.maxxtermux.design.AxText
 import com.maxxcodebug.maxxtermux.model.BuildJob
 import com.maxxcodebug.maxxtermux.model.Host
 import com.maxxcodebug.maxxtermux.model.HostKind
+import com.maxxcodebug.maxxtermux.model.HostStatus
 import com.maxxcodebug.maxxtermux.model.ProgressPrefs
-import kotlin.math.roundToInt
+import com.maxxcodebug.maxxtermux.ssh.SessionState
+import com.maxxcodebug.maxxtermux.state.AppState
+import com.maxxcodebug.maxxtermux.state.Screen
+import kotlinx.coroutines.delay
 
 @Composable
-fun HomeScreen(
-    hosts: List<Host>,
-    build: BuildJob?,
-    prefs: ProgressPrefs,
-    onOpenSession: () -> Unit = {},
-    onHostClick: (Host) -> Unit = {},
-    onAddHost: () -> Unit = {},
-    onNewConnection: () -> Unit = {},
-) {
-    var tab by remember { mutableStateOf(AxTab.Home) }
-    val online = hosts.count { it.online }
+fun HomeScreen() {
+    val hosts = AppState.hosts
+    val build = BuildTracker.current
+    val prefs = AppState.progressPrefs
+    val connected = AppState.sessions.count { it.state == SessionState.Connected }
+    val online = hosts.count { AppState.statuses[it.id]?.online == true }
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000)
+            now = System.currentTimeMillis()
+        }
+    }
+    LaunchedEffect(hosts.size) { AppState.probeAll() }
 
     Box(Modifier.fillMaxSize().background(AxColors.Bg)) {
         DecorCircles()
@@ -89,41 +98,57 @@ fun HomeScreen(
                 ) { AxText("AX", size = 15.sp, color = Color(0xFFBFD8E2), weight = FontWeight.Medium) }
             }
             Spacer(Modifier.height(4.dp))
-            Row(Modifier.padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(7.dp).clip(CircleShape).background(AxColors.Online))
+            Row(
+                Modifier.padding(horizontal = 4.dp).clickable { AppState.probeAll() },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier.size(7.dp).clip(CircleShape)
+                        .background(if (connected > 0) AxColors.Online else AxColors.Offline),
+                )
                 Spacer(Modifier.width(6.dp))
-                val running = if (build != null) "1 build running" else "No builds running"
-                AxText("$running · $online hosts online", size = 13.sp, color = AxColors.OnMuted)
+                val line = if (hosts.isEmpty()) {
+                    "No hosts yet"
+                } else {
+                    "$connected connected · $online of ${hosts.size} online"
+                }
+                AxText(line, size = 13.sp, color = AxColors.OnMuted)
             }
             Spacer(Modifier.height(14.dp))
 
             if (build != null) {
-                BuildCard(build, prefs, onOpenSession)
+                BuildCard(build, prefs, now)
                 Spacer(Modifier.height(14.dp))
             }
 
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                AxText("Hosts", size = 18.sp, weight = FontWeight.Medium)
-                AxText("${hosts.size} saved", size = 13.sp, color = Color(0xFF8FC3D6))
+            if (hosts.isEmpty()) {
+                EmptyCard()
+                Spacer(Modifier.height(14.dp))
+            } else {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom,
+                ) {
+                    AxText("Hosts", size = 18.sp, weight = FontWeight.Medium)
+                    AxText("${hosts.size} saved", size = 13.sp, color = Color(0xFF8FC3D6))
+                }
+                Spacer(Modifier.height(8.dp))
             }
-            Spacer(Modifier.height(8.dp))
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                hosts.forEach { HostRow(it) { onHostClick(it) } }
-                AddHostRow(onAddHost)
+                hosts.forEach { h ->
+                    val hasSession = AppState.sessions.any {
+                        it.host.id == h.id && it.state == SessionState.Connected
+                    }
+                    HostRow(h, AppState.statuses[h.id], hasSession)
+                }
+                AddHostRow()
             }
         }
 
-        AxGlassDock(
-            selected = tab,
-            onSelect = { tab = it },
-            onFab = onNewConnection,
-            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding(),
-        )
+        val menu = AppState.hostMenu
+        if (menu != null) HostMenu(menu)
     }
 }
 
@@ -134,9 +159,31 @@ private fun DecorCircles() {
     Box(Modifier.offset(x = 260.dp, y = 560.dp).size(140.dp).clip(CircleShape).background(AxColors.CircleC))
 }
 
+private fun formatElapsed(ms: Long): String {
+    val s = (ms / 1000).coerceAtLeast(0)
+    return if (s >= 3600) "%dh %02dm".format(s / 3600, (s % 3600) / 60) else "%dm %02ds".format(s / 60, s % 60)
+}
+
 @Composable
-private fun BuildCard(job: BuildJob, prefs: ProgressPrefs, onOpen: () -> Unit) {
-    val pct = (job.progress * 100).roundToInt()
+private fun EmptyCard() {
+    Column(
+        Modifier.fillMaxWidth().clip(AxShapes.Card).background(AxColors.Teal).padding(20.dp),
+    ) {
+        AxText("Add your first host", size = 22.sp, color = AxColors.OnTeal, weight = FontWeight.Medium)
+        Spacer(Modifier.height(6.dp))
+        AxText(
+            "Connect to your build server over SSH. Your password or key is stored encrypted on this phone.",
+            size = 14.sp,
+            color = AxColors.AccentSoft,
+        )
+        Spacer(Modifier.height(16.dp))
+        AxButton("Add host", onClick = { AppState.screen = Screen.AddHost }, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+@Composable
+private fun BuildCard(job: BuildJob, prefs: ProgressPrefs, now: Long) {
+    val progress = job.percent / 100f
     Column(
         Modifier.fillMaxWidth().clip(AxShapes.Card).background(AxColors.Teal).padding(18.dp),
     ) {
@@ -144,31 +191,43 @@ private fun BuildCard(job: BuildJob, prefs: ProgressPrefs, onOpen: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(104.dp), contentAlignment = Alignment.Center) {
                     AxProgress(
-                        job.progress, prefs.style, Modifier.fillMaxSize(),
+                        progress, prefs.style, Modifier.fillMaxSize(),
                         prefs.thicknessDp.dp, prefs.color, prefs.animateWave,
                     )
-                    AxText("$pct%", size = 20.sp, color = AxColors.OnTeal, weight = FontWeight.Medium)
+                    AxText("${job.percent}%", size = 20.sp, color = AxColors.OnTeal, weight = FontWeight.Medium)
                 }
                 Spacer(Modifier.width(16.dp))
                 Column(Modifier.weight(1f)) {
                     AxText("Running now", size = 12.sp, color = AxColors.AccentSoft)
-                    AxText(job.command, size = 22.sp, color = AxColors.OnTeal, weight = FontWeight.Medium)
-                    AxText("${job.target} · ${job.hostName}", size = 13.sp, color = AxColors.AccentSoft)
-                    AxText("Elapsed ${job.elapsed}", size = 12.sp, color = AxColors.OnTealMuted)
+                    AxText(job.command, size = 22.sp, color = AxColors.OnTeal, weight = FontWeight.Medium, maxLines = 1)
+                    AxText(job.hostName, size = 13.sp, color = AxColors.AccentSoft, maxLines = 1)
+                    AxText(
+                        "${job.done} / ${job.total} · ${formatElapsed(now - job.startedAt)}",
+                        size = 12.sp,
+                        color = AxColors.OnTealMuted,
+                    )
                 }
             }
         } else {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
-                Column {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                Column(Modifier.weight(1f)) {
                     AxText("Running now", size = 12.sp, color = AxColors.AccentSoft)
-                    AxText(job.command, size = 22.sp, color = AxColors.OnTeal, weight = FontWeight.Medium)
+                    AxText(job.command, size = 22.sp, color = AxColors.OnTeal, weight = FontWeight.Medium, maxLines = 1)
                 }
-                AxText("$pct%", size = 20.sp, color = AxColors.OnTeal, weight = FontWeight.Medium)
+                AxText("${job.percent}%", size = 20.sp, color = AxColors.OnTeal, weight = FontWeight.Medium)
             }
-            AxText("${job.target} · ${job.hostName} · ${job.elapsed}", size = 13.sp, color = AxColors.AccentSoft)
+            AxText(
+                "${job.hostName} · ${job.done} / ${job.total} · ${formatElapsed(now - job.startedAt)}",
+                size = 13.sp,
+                color = AxColors.AccentSoft,
+            )
             Spacer(Modifier.height(12.dp))
             AxProgress(
-                job.progress, prefs.style,
+                progress, prefs.style,
                 Modifier.fillMaxWidth().height(28.dp),
                 prefs.thicknessDp.dp, prefs.color, prefs.animateWave,
             )
@@ -178,43 +237,55 @@ private fun BuildCard(job: BuildJob, prefs: ProgressPrefs, onOpen: () -> Unit) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(
                 Modifier.weight(1f).clip(AxShapes.Button).background(AxColors.Accent)
-                    .clickable { onOpen() }.padding(vertical = 11.dp),
+                    .clickable { if (AppState.active != null) AppState.screen = Screen.Shell }
+                    .padding(vertical = 11.dp),
                 contentAlignment = Alignment.Center,
             ) { AxText("Open session", size = 14.sp, color = AxColors.OnAccent, weight = FontWeight.Medium) }
             Box(
-                Modifier.size(46.dp).clip(AxShapes.Button).background(AxColors.TealDeep),
+                Modifier.clip(AxShapes.Button).background(AxColors.TealDeep)
+                    .clickable { BuildTracker.interrupt() }
+                    .padding(horizontal = 18.dp, vertical = 11.dp),
                 contentAlignment = Alignment.Center,
-            ) { AxIcon(Icons.Rounded.Notifications, tint = AxColors.AccentSoft, size = 20.dp) }
+            ) { AxText("Stop", size = 14.sp, color = AxColors.AccentSoft, weight = FontWeight.Medium) }
         }
     }
 }
 
-private data class HostStyle(
-    val bg: Color, val iconBg: Color, val text: Color, val sub: Color,
-    val iconShape: Shape, val icon: androidx.compose.ui.graphics.vector.ImageVector,
+private class HostLook(
+    val bg: Color,
+    val iconBg: Color,
+    val text: Color,
+    val sub: Color,
+    val iconShape: androidx.compose.ui.graphics.Shape,
+    val icon: ImageVector,
 )
 
-private fun styleFor(kind: HostKind) = when (kind) {
-    HostKind.Server -> HostStyle(
+private fun lookFor(kind: HostKind) = when (kind) {
+    HostKind.Server -> HostLook(
         AxColors.IndigoBg, AxColors.IndigoIcon, AxColors.IndigoText, AxColors.IndigoSub,
         AxShapes.IconServer, Icons.Rounded.Dns,
     )
-    HostKind.Local -> HostStyle(
+    HostKind.Embedded -> HostLook(
         AxColors.GreenBg, AxColors.GreenIcon, AxColors.GreenText, AxColors.GreenSub,
-        AxShapes.IconDevice, Icons.Rounded.PhoneAndroid,
-    )
-    HostKind.Embedded -> HostStyle(
-        AxColors.RedBg, AxColors.RedIcon, AxColors.RedText, AxColors.RedSub,
         AxShapes.IconEmbedded, Icons.Rounded.Memory,
     )
 }
 
 @Composable
-private fun HostRow(host: Host, onClick: () -> Unit) {
-    val s = styleFor(host.kind)
+private fun HostRow(host: Host, status: HostStatus?, connected: Boolean) {
+    val s = lookFor(host.kind)
     Row(
-        Modifier.fillMaxWidth().clip(AxShapes.Row).background(s.bg)
-            .clickable { onClick() }.padding(horizontal = 14.dp, vertical = 12.dp),
+        Modifier
+            .fillMaxWidth()
+            .clip(AxShapes.Row)
+            .background(s.bg)
+            .pointerInput(host.id) {
+                detectTapGestures(
+                    onTap = { AppState.connect(host) },
+                    onLongPress = { AppState.hostMenu = host },
+                )
+            }
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(48.dp).clip(s.iconShape).background(s.iconBg), contentAlignment = Alignment.Center) {
@@ -223,36 +294,77 @@ private fun HostRow(host: Host, onClick: () -> Unit) {
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             AxText(host.name, size = 16.sp, color = s.text, weight = FontWeight.Medium, maxLines = 1)
-            AxText(
-                if (host.kind == HostKind.Local) "Local shell" else "${host.user}@${host.address.substringBefore('.')}",
-                size = 12.sp, color = s.sub, mono = host.kind != HostKind.Local, maxLines = 1,
-            )
+            AxText("${host.user}@${host.address}", size = 12.sp, color = s.sub, mono = true, maxLines = 1)
         }
         Column(horizontalAlignment = Alignment.End) {
-            if (host.online) {
-                AxText(
-                    host.latencyMs?.let { "$it ms" } ?: "Ready",
-                    size = 12.sp, color = AxColors.Online,
+            when {
+                connected -> AxText("Connected", size = 12.sp, color = AxColors.Online)
+                status == null || status.checking -> AxText("Checking", size = 12.sp, color = s.sub)
+                status.online -> AxText(
+                    status.latencyMs?.let { "$it ms" } ?: "Online",
+                    size = 12.sp,
+                    color = AxColors.Online,
                 )
-                host.cpuPercent?.let { AxText("CPU $it%", size = 11.sp, color = s.sub) }
-            } else {
-                AxText("Offline", size = 12.sp, color = AxColors.Offline)
+                else -> AxText("Offline", size = 12.sp, color = AxColors.Offline)
             }
         }
     }
 }
 
 @Composable
-private fun AddHostRow(onClick: () -> Unit) {
+private fun AddHostRow() {
     Row(
-        Modifier.fillMaxWidth().clip(AxShapes.Row)
+        Modifier
+            .fillMaxWidth()
+            .clip(AxShapes.Row)
             .border(1.5.dp, Color(0xFF3A5662), AxShapes.Row)
-            .clickable { onClick() }.padding(16.dp),
+            .clickable { AppState.screen = Screen.AddHost }
+            .padding(16.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AxIcon(Icons.Rounded.Add, tint = Color(0xFF8FC3D6), size = 20.dp)
         Spacer(Modifier.width(8.dp))
         AxText("Add host", size = 15.sp, color = Color(0xFF8FC3D6))
+    }
+}
+
+@Composable
+private fun HostMenu(host: Host) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color(0x99000000))
+            .pointerInput(Unit) { detectTapGestures { AppState.hostMenu = null } },
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier
+                .padding(32.dp)
+                .clip(AxShapes.Card)
+                .background(AxColors.Surface)
+                .pointerInput(Unit) { detectTapGestures { } }
+                .padding(20.dp),
+        ) {
+            AxText(host.name, size = 20.sp, weight = FontWeight.Medium)
+            AxText("${host.user}@${host.address}:${host.port}", size = 13.sp, color = AxColors.OnMuted, mono = true)
+            Spacer(Modifier.height(16.dp))
+            AxButton(
+                "Delete host",
+                onClick = {
+                    AppState.deleteHost(host)
+                    AppState.hostMenu = null
+                },
+                modifier = Modifier.fillMaxWidth(),
+                kind = AxButtonKind.Danger,
+            )
+            Spacer(Modifier.height(8.dp))
+            AxButton(
+                "Cancel",
+                onClick = { AppState.hostMenu = null },
+                modifier = Modifier.fillMaxWidth(),
+                kind = AxButtonKind.Secondary,
+            )
+        }
     }
 }

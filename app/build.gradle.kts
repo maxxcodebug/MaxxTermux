@@ -12,8 +12,8 @@ android {
         applicationId = "com.maxxcodebug.maxxtermux"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
     }
 
     buildTypes {
@@ -31,6 +31,21 @@ android {
     buildFeatures {
         compose = true
     }
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/versions/9/OSGI-INF/MANIFEST.MF",
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/AL2.0",
+                "META-INF/LGPL2.1",
+                "META-INF/INDEX.LIST",
+            )
+        }
+    }
 }
 
 dependencies {
@@ -40,4 +55,9 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.icons.extended)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // SSH
+    implementation("com.hierynomus:sshj:0.39.0")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
 }
