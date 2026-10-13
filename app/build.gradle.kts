@@ -12,8 +12,8 @@ android {
         applicationId = "com.maxxcodebug.maxxtermux"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
     }
 
     buildTypes {
@@ -54,6 +54,7 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
+    implementation("androidx.compose.animation:animation")
     implementation(libs.androidx.compose.icons.extended)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 

@@ -1,7 +1,11 @@
 package com.maxxcodebug.maxxtermux.ui.shell
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -63,12 +67,14 @@ import androidx.compose.ui.unit.sp
 import com.maxxcodebug.maxxtermux.design.AxButton
 import com.maxxcodebug.maxxtermux.design.AxChoiceChip
 import com.maxxcodebug.maxxtermux.design.AxColors
+import com.maxxcodebug.maxxtermux.design.AxField
 import com.maxxcodebug.maxxtermux.design.AxIconButton
 import com.maxxcodebug.maxxtermux.design.AxText
-import com.maxxcodebug.maxxtermux.ssh.SessionState
-import com.maxxcodebug.maxxtermux.ssh.SshSession
+import com.maxxcodebug.maxxtermux.design.axClickable
 import com.maxxcodebug.maxxtermux.state.AppState
 import com.maxxcodebug.maxxtermux.state.Screen
+import com.maxxcodebug.maxxtermux.terminal.SessionState
+import com.maxxcodebug.maxxtermux.terminal.TermSession
 import com.maxxcodebug.maxxtermux.terminal.TerminalView
 import kotlinx.coroutines.delay
 
@@ -88,7 +94,8 @@ private val CTRL_KEYS = listOf(
 fun ShellScreen() {
     val session = AppState.active
     if (session == null) {
-        EmptyShell()
+        LaunchedEffect(Unit) { AppState.openTerminal() }
+        Box(Modifier.fillMaxSize().background(AxColors.Bg))
         return
     }
 
@@ -180,7 +187,7 @@ fun ShellScreen() {
     }
 
     LaunchedEffect(session) {
-        delay(200)
+        delay(250)
         focusKeyboard()
     }
 
@@ -215,9 +222,19 @@ fun ShellScreen() {
 
         Spacer(Modifier.size(8.dp))
 
-        if (showSnippets) {
-            SnippetPanel(onPaste = { send(it) }, onRun = { send(it + "\r") })
-            Spacer(Modifier.size(8.dp))
+        AnimatedVisibility(
+            visible = showSnippets,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically(),
+        ) {
+            Column {
+                SnippetPanel(
+                    onPaste = { send(it) },
+                    onRun = { send(it + "\r") },
+                    onCopy = { clipboard.setText(AnnotatedString(it)) },
+                )
+                Spacer(Modifier.size(8.dp))
+            }
         }
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -251,31 +268,16 @@ fun ShellScreen() {
 }
 
 @Composable
-private fun EmptyShell() {
-    Column(
-        Modifier.fillMaxSize().background(AxColors.Bg).systemBarsPadding().padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        AxText("No active session", size = 22.sp, weight = FontWeight.Medium)
-        Spacer(Modifier.size(8.dp))
-        AxText("Pick a host on Home to connect.", size = 14.sp, color = AxColors.OnMuted)
-        Spacer(Modifier.size(20.dp))
-        AxButton("Go to hosts", onClick = { AppState.screen = Screen.Home })
-    }
-}
-
-@Composable
-private fun ShellHeader(session: SshSession, onCopy: () -> Unit) {
+private fun ShellHeader(session: TermSession, onCopy: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             AxIconButton(Icons.AutoMirrored.Rounded.ArrowBack, { AppState.screen = Screen.Home })
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                AxText(session.host.name, size = 17.sp, weight = FontWeight.Medium, maxLines = 1)
+                AxText(session.title, size = 17.sp, weight = FontWeight.Medium, maxLines = 1)
                 val status: Pair<String, Color> = when (session.state) {
                     SessionState.Connecting -> Pair("Connecting...", AxColors.AccentSoft)
-                    SessionState.Connected -> Pair("${session.host.user}@${session.host.address}", AxColors.Online)
+                    SessionState.Connected -> Pair(session.subtitle, AxColors.Online)
                     SessionState.Closed -> Pair("Disconnected", AxColors.Offline)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -284,23 +286,22 @@ private fun ShellHeader(session: SshSession, onCopy: () -> Unit) {
                     AxText(status.first, size = 12.sp, color = AxColors.OnMuted, maxLines = 1)
                 }
             }
-            if (session.state == SessionState.Closed) {
-                AxChoiceChip("Reconnect", true) { session.connect() }
+            if (session.canReconnect && session.state == SessionState.Closed) {
+                AxChoiceChip("Reconnect", true) { session.reconnect() }
                 Spacer(Modifier.width(8.dp))
             }
             AxIconButton(Icons.Rounded.ContentCopy, onCopy)
             Spacer(Modifier.width(8.dp))
             AxIconButton(Icons.Rounded.Close, { AppState.closeSession(session) })
         }
-        if (AppState.sessions.size > 1) {
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                AppState.sessions.toList().forEach { s ->
-                    AxChoiceChip(s.host.name, s === session) { AppState.active = s }
-                }
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            AppState.sessions.toList().forEach { s ->
+                AxChoiceChip(s.title, s === session) { AppState.active = s }
             }
+            AxChoiceChip("+ New", false) { AppState.newLocal() }
         }
     }
 }
@@ -314,9 +315,9 @@ private fun KeyCap(
 ) {
     Box(
         modifier
+            .axClickable(onClick)
             .clip(RoundedCornerShape(12.dp))
             .background(if (selected) AxColors.Accent else AxColors.Container)
-            .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -331,43 +332,89 @@ private fun KeyCap(
 }
 
 @Composable
-private fun SnippetPanel(onPaste: (String) -> Unit, onRun: (String) -> Unit) {
+private fun SnippetPanel(
+    onPaste: (String) -> Unit,
+    onRun: (String) -> Unit,
+    onCopy: (String) -> Unit,
+) {
+    var edit by remember { mutableStateOf(false) }
+    var newText by remember { mutableStateOf("") }
     Column(
         Modifier
             .fillMaxWidth()
-            .heightIn(max = 190.dp)
+            .heightIn(max = 250.dp)
             .clip(RoundedCornerShape(20.dp))
             .background(AxColors.Surface)
             .verticalScroll(rememberScrollState())
             .padding(12.dp),
     ) {
-        AxText("Tap to paste · hold to run", size = 11.sp, color = AxColors.OnMuted)
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AxText(
+                if (edit) "Copy, delete or add" else "Tap to paste · hold to run",
+                size = 11.sp,
+                color = AxColors.OnMuted,
+            )
+            AxChoiceChip(if (edit) "Done" else "Edit", edit) { edit = !edit }
+        }
         val groups = AppState.snippets.groupBy { it.group }
         for ((group, items) in groups) {
             Spacer(Modifier.size(8.dp))
             AxText(group, size = 12.sp, color = Color(0xFF8FC3D6))
             Spacer(Modifier.size(4.dp))
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                items.forEach { sn ->
-                    Box(
-                        Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(AxColors.Teal)
-                            .pointerInput(sn.id) {
-                                detectTapGestures(
-                                    onTap = { onPaste(sn.text) },
-                                    onLongPress = { onRun(sn.text) },
-                                )
-                            }
-                            .padding(horizontal = 11.dp, vertical = 8.dp),
-                    ) {
-                        AxText(sn.text, size = 12.sp, color = AxColors.OnTeal, mono = true, maxLines = 1)
+            if (!edit) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    items.forEach { sn ->
+                        Box(
+                            Modifier
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(AxColors.Teal)
+                                .pointerInput(sn.id) {
+                                    detectTapGestures(
+                                        onTap = { onPaste(sn.text) },
+                                        onLongPress = { onRun(sn.text) },
+                                    )
+                                }
+                                .padding(horizontal = 11.dp, vertical = 8.dp),
+                        ) {
+                            AxText(sn.text, size = 12.sp, color = AxColors.OnTeal, mono = true, maxLines = 1)
+                        }
+                    }
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items.forEach { sn ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            AxText(sn.text, size = 13.sp, mono = true, modifier = Modifier.weight(1f))
+                            AxIconButton(Icons.Rounded.ContentCopy, { onCopy(sn.text) })
+                            Spacer(Modifier.width(6.dp))
+                            AxIconButton(Icons.Rounded.Close, { AppState.deleteSnippet(sn) })
+                        }
                     }
                 }
             }
+        }
+        if (edit) {
+            Spacer(Modifier.size(12.dp))
+            AxField("New command", newText, { newText = it }, mono = true)
+            Spacer(Modifier.size(8.dp))
+            AxButton(
+                "Add snippet",
+                onClick = {
+                    val t = newText.trim()
+                    if (t.isNotEmpty()) {
+                        AppState.addSnippet("Custom", t)
+                        newText = ""
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }

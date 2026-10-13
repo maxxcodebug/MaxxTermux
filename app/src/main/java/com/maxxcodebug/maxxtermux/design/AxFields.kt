@@ -1,7 +1,6 @@
 package com.maxxcodebug.maxxtermux.design
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +15,10 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -80,11 +82,16 @@ fun AxField(
 
 @Composable
 fun AxChoiceChip(text: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val bg by animateColorAsState(
+        targetValue = if (selected) AxColors.Accent else AxColors.SurfaceHigh,
+        animationSpec = tween(220),
+        label = "chip",
+    )
     Box(
         modifier
+            .axClickable(onClick)
             .clip(AxShapes.Chip)
-            .background(if (selected) AxColors.Accent else AxColors.SurfaceHigh)
-            .clickable { onClick() }
+            .background(bg)
             .padding(horizontal = 14.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -118,9 +125,9 @@ fun AxButton(
     }
     Box(
         modifier
+            .axClickable(onClick)
             .clip(AxShapes.Button)
             .background(bg)
-            .clickable { onClick() }
             .padding(horizontal = 20.dp, vertical = 13.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -138,9 +145,9 @@ fun AxIconButton(
     Box(
         modifier
             .size(40.dp)
+            .axClickable(onClick)
             .clip(AxShapes.Chip)
-            .background(AxColors.Container)
-            .clickable { onClick() },
+            .background(AxColors.Container),
         contentAlignment = Alignment.Center,
     ) {
         AxIcon(icon, tint = tint, size = 20.dp)

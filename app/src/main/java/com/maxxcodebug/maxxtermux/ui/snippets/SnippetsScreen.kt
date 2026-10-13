@@ -16,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,6 +25,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.maxxcodebug.maxxtermux.design.AxButton
@@ -35,6 +39,7 @@ import com.maxxcodebug.maxxtermux.design.AxScreenHeader
 import com.maxxcodebug.maxxtermux.design.AxShapes
 import com.maxxcodebug.maxxtermux.design.AxText
 import com.maxxcodebug.maxxtermux.state.AppState
+import com.maxxcodebug.maxxtermux.state.Screen
 
 private val GROUPS = listOf("AOSP build", "Git", "GitHub CLI", "Navigate", "Custom")
 
@@ -42,6 +47,7 @@ private val GROUPS = listOf("AOSP build", "Git", "GitHub CLI", "Navigate", "Cust
 fun SnippetsScreen() {
     var group by remember { mutableStateOf(GROUPS[0]) }
     var text by remember { mutableStateOf("") }
+    val clipboard = LocalClipboardManager.current
     val grouped = AppState.snippets.groupBy { it.group }
 
     Column(
@@ -52,7 +58,7 @@ fun SnippetsScreen() {
             .verticalScroll(rememberScrollState())
             .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 110.dp),
     ) {
-        AxScreenHeader("Snippets", "Commands for the Shell")
+        AxScreenHeader("Snippets", "Also available inside the Terminal", onBack = { AppState.screen = Screen.Settings })
 
         AxField("New command", text, { text = it }, mono = true)
         Spacer(Modifier.height(8.dp))
@@ -77,16 +83,22 @@ fun SnippetsScreen() {
 
         for ((g, items) in grouped) {
             Spacer(Modifier.height(18.dp))
-            AxText(g, size = 14.sp, color = androidx.compose.ui.graphics.Color(0xFF8FC3D6))
+            AxText(g, size = 14.sp, color = Color(0xFF8FC3D6))
             Spacer(Modifier.height(6.dp))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 items.forEach { s ->
                     Row(
-                        Modifier.fillMaxWidth().clip(AxShapes.Row).background(AxColors.Surface).padding(start = 16.dp, top = 6.dp, bottom = 6.dp, end = 6.dp),
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(AxShapes.Row)
+                            .background(AxColors.Surface)
+                            .padding(start = 16.dp, top = 6.dp, bottom = 6.dp, end = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         AxText(s.text, size = 14.sp, mono = true, modifier = Modifier.weight(1f))
                         Spacer(Modifier.width(8.dp))
+                        AxIconButton(Icons.Rounded.ContentCopy, { clipboard.setText(AnnotatedString(s.text)) })
+                        Spacer(Modifier.width(6.dp))
                         AxIconButton(Icons.Rounded.Close, { AppState.deleteSnippet(s) })
                     }
                 }

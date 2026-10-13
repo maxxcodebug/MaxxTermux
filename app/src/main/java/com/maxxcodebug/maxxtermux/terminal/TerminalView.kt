@@ -2,6 +2,11 @@ package com.maxxcodebug.maxxtermux.terminal
 
 import android.graphics.Paint
 import android.graphics.Typeface
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -21,7 +26,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.sp
-import com.maxxcodebug.maxxtermux.ssh.SshSession
 import kotlin.math.ceil
 
 private const val DEF_FG = 0xFFDDE6EA.toInt()
@@ -34,7 +38,7 @@ private fun brighten(color: Int): Int {
 
 @Composable
 fun TerminalView(
-    session: SshSession,
+    session: TermSession,
     fontSp: Float,
     scrollOffset: Int,
     onScrollChange: (Int) -> Unit,
@@ -53,6 +57,12 @@ fun TerminalView(
     val cellH = ceil(fm.descent - fm.ascent)
     val baseline = -fm.ascent
     var dragAcc by remember { mutableFloatStateOf(0f) }
+    val blink by rememberInfiniteTransition(label = "cursor").animateFloat(
+        initialValue = 1f,
+        targetValue = 0.15f,
+        animationSpec = infiniteRepeatable(tween(650), RepeatMode.Reverse),
+        label = "blink",
+    )
     val currentOffset by rememberUpdatedState(scrollOffset)
 
     Canvas(
@@ -124,7 +134,7 @@ fun TerminalView(
             }
             if (scrollOffset == 0 && e.cursorVisible) {
                 drawRect(
-                    Color(0x99A5CFE0),
+                    Color(0xFFA5CFE0).copy(alpha = 0.8f * blink),
                     Offset(e.curCol * cellW, e.curRow * cellH),
                     Size(cellW, cellH),
                 )

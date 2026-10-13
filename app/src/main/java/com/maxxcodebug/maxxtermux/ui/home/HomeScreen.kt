@@ -1,5 +1,6 @@
 package com.maxxcodebug.maxxtermux.ui.home
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
@@ -48,14 +50,17 @@ import com.maxxcodebug.maxxtermux.design.AxIcon
 import com.maxxcodebug.maxxtermux.design.AxProgress
 import com.maxxcodebug.maxxtermux.design.AxShapes
 import com.maxxcodebug.maxxtermux.design.AxText
+import com.maxxcodebug.maxxtermux.design.axAppear
+import com.maxxcodebug.maxxtermux.design.axClickable
 import com.maxxcodebug.maxxtermux.model.BuildJob
 import com.maxxcodebug.maxxtermux.model.Host
 import com.maxxcodebug.maxxtermux.model.HostKind
 import com.maxxcodebug.maxxtermux.model.HostStatus
 import com.maxxcodebug.maxxtermux.model.ProgressPrefs
-import com.maxxcodebug.maxxtermux.ssh.SessionState
+import com.maxxcodebug.maxxtermux.ssh.SshSession
 import com.maxxcodebug.maxxtermux.state.AppState
 import com.maxxcodebug.maxxtermux.state.Screen
+import com.maxxcodebug.maxxtermux.terminal.SessionState
 import kotlinx.coroutines.delay
 
 @Composable
@@ -63,7 +68,7 @@ fun HomeScreen() {
     val hosts = AppState.hosts
     val build = BuildTracker.current
     val prefs = AppState.progressPrefs
-    val connected = AppState.sessions.count { it.state == SessionState.Connected }
+    val connected = AppState.sessions.count { it is SshSession && it.state == SessionState.Connected }
     val online = hosts.count { AppState.statuses[it.id]?.online == true }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
@@ -87,19 +92,28 @@ fun HomeScreen() {
                 .padding(top = 8.dp, bottom = 110.dp),
         ) {
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 4.dp).axAppear(0),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                AxText("MaxxTermux", size = 28.sp, weight = FontWeight.Medium)
+                Column {
+                    AxText("MaxxTermux", size = 28.sp, weight = FontWeight.Medium)
+                    if (AppState.userName.isNotBlank()) {
+                        AxText("Hi, ${AppState.userName}", size = 13.sp, color = AxColors.OnMuted)
+                    }
+                }
                 Box(
-                    Modifier.size(44.dp).clip(RoundedCornerShape(16.dp)).background(AxColors.Container),
+                    Modifier
+                        .size(44.dp)
+                        .axClickable { AppState.profileOpen = true }
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(AxColors.Container),
                     contentAlignment = Alignment.Center,
-                ) { AxText("AX", size = 15.sp, color = Color(0xFFBFD8E2), weight = FontWeight.Medium) }
+                ) { AxText(AppState.initials(), size = 15.sp, color = Color(0xFFBFD8E2), weight = FontWeight.Medium) }
             }
             Spacer(Modifier.height(4.dp))
             Row(
-                Modifier.padding(horizontal = 4.dp).clickable { AppState.probeAll() },
+                Modifier.padding(horizontal = 4.dp).axAppear(1).clickable { AppState.probeAll() },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(
@@ -108,7 +122,7 @@ fun HomeScreen() {
                 )
                 Spacer(Modifier.width(6.dp))
                 val line = if (hosts.isEmpty()) {
-                    "No hosts yet"
+                    "No saved hosts yet"
                 } else {
                     "$connected connected · $online of ${hosts.size} online"
                 }
@@ -116,34 +130,36 @@ fun HomeScreen() {
             }
             Spacer(Modifier.height(14.dp))
 
-            if (build != null) {
-                BuildCard(build, prefs, now)
-                Spacer(Modifier.height(14.dp))
-            }
-
-            if (hosts.isEmpty()) {
-                EmptyCard()
-                Spacer(Modifier.height(14.dp))
-            } else {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Bottom,
-                ) {
-                    AxText("Hosts", size = 18.sp, weight = FontWeight.Medium)
-                    AxText("${hosts.size} saved", size = 13.sp, color = Color(0xFF8FC3D6))
+            Column(Modifier.animateContentSize()) {
+                if (build != null) {
+                    Box(Modifier.axAppear(0)) { BuildCard(build, prefs, now) }
+                    Spacer(Modifier.height(14.dp))
                 }
-                Spacer(Modifier.height(8.dp))
-            }
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                hosts.forEach { h ->
-                    val hasSession = AppState.sessions.any {
-                        it.host.id == h.id && it.state == SessionState.Connected
+                if (hosts.isEmpty()) {
+                    Box(Modifier.axAppear(2)) { EmptyCard() }
+                    Spacer(Modifier.height(14.dp))
+                } else {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 6.dp).axAppear(2),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Bottom,
+                    ) {
+                        AxText("Saved hosts", size = 18.sp, weight = FontWeight.Medium)
+                        AxText("${hosts.size}", size = 13.sp, color = Color(0xFF8FC3D6))
                     }
-                    HostRow(h, AppState.statuses[h.id], hasSession)
+                    Spacer(Modifier.height(8.dp))
                 }
-                AddHostRow()
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    hosts.forEachIndexed { i, h ->
+                        val hasSession = AppState.sessions.any {
+                            it is SshSession && it.host.id == h.id && it.state == SessionState.Connected
+                        }
+                        HostRow(h, AppState.statuses[h.id], hasSession, i + 3)
+                    }
+                    AddHostRow(hosts.size + 3)
+                }
             }
         }
 
@@ -169,15 +185,22 @@ private fun EmptyCard() {
     Column(
         Modifier.fillMaxWidth().clip(AxShapes.Card).background(AxColors.Teal).padding(20.dp),
     ) {
-        AxText("Add your first host", size = 22.sp, color = AxColors.OnTeal, weight = FontWeight.Medium)
+        AxText("Connect like in Termux", size = 22.sp, color = AxColors.OnTeal, weight = FontWeight.Medium)
         Spacer(Modifier.height(6.dp))
         AxText(
-            "Connect to your build server over SSH. Your password or key is stored encrypted on this phone.",
+            "Open the terminal and type  ssh user@host . The password is asked right there, and you can save it for next time.",
             size = 14.sp,
             color = AxColors.AccentSoft,
         )
         Spacer(Modifier.height(16.dp))
-        AxButton("Add host", onClick = { AppState.screen = Screen.AddHost }, modifier = Modifier.fillMaxWidth())
+        AxButton("Open terminal", onClick = { AppState.openTerminal() }, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(8.dp))
+        AxButton(
+            "Add host with a form",
+            onClick = { AppState.screen = Screen.AddHost },
+            modifier = Modifier.fillMaxWidth(),
+            kind = AxButtonKind.Secondary,
+        )
     }
 }
 
@@ -236,14 +259,16 @@ private fun BuildCard(job: BuildJob, prefs: ProgressPrefs, now: Long) {
         Spacer(Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(
-                Modifier.weight(1f).clip(AxShapes.Button).background(AxColors.Accent)
-                    .clickable { if (AppState.active != null) AppState.screen = Screen.Shell }
+                Modifier.weight(1f)
+                    .axClickable { if (AppState.active != null) AppState.screen = Screen.Shell }
+                    .clip(AxShapes.Button).background(AxColors.Accent)
                     .padding(vertical = 11.dp),
                 contentAlignment = Alignment.Center,
-            ) { AxText("Open session", size = 14.sp, color = AxColors.OnAccent, weight = FontWeight.Medium) }
+            ) { AxText("Open terminal", size = 14.sp, color = AxColors.OnAccent, weight = FontWeight.Medium) }
             Box(
-                Modifier.clip(AxShapes.Button).background(AxColors.TealDeep)
-                    .clickable { BuildTracker.interrupt() }
+                Modifier
+                    .axClickable { BuildTracker.interrupt() }
+                    .clip(AxShapes.Button).background(AxColors.TealDeep)
                     .padding(horizontal = 18.dp, vertical = 11.dp),
                 contentAlignment = Alignment.Center,
             ) { AxText("Stop", size = 14.sp, color = AxColors.AccentSoft, weight = FontWeight.Medium) }
@@ -256,7 +281,7 @@ private class HostLook(
     val iconBg: Color,
     val text: Color,
     val sub: Color,
-    val iconShape: androidx.compose.ui.graphics.Shape,
+    val iconShape: Shape,
     val icon: ImageVector,
 )
 
@@ -272,11 +297,12 @@ private fun lookFor(kind: HostKind) = when (kind) {
 }
 
 @Composable
-private fun HostRow(host: Host, status: HostStatus?, connected: Boolean) {
+private fun HostRow(host: Host, status: HostStatus?, connected: Boolean, index: Int) {
     val s = lookFor(host.kind)
     Row(
         Modifier
             .fillMaxWidth()
+            .axAppear(index)
             .clip(AxShapes.Row)
             .background(s.bg)
             .pointerInput(host.id) {
@@ -312,10 +338,11 @@ private fun HostRow(host: Host, status: HostStatus?, connected: Boolean) {
 }
 
 @Composable
-private fun AddHostRow() {
+private fun AddHostRow(index: Int) {
     Row(
         Modifier
             .fillMaxWidth()
+            .axAppear(index)
             .clip(AxShapes.Row)
             .border(1.5.dp, Color(0xFF3A5662), AxShapes.Row)
             .clickable { AppState.screen = Screen.AddHost }
@@ -325,7 +352,7 @@ private fun AddHostRow() {
     ) {
         AxIcon(Icons.Rounded.Add, tint = Color(0xFF8FC3D6), size = 20.dp)
         Spacer(Modifier.width(8.dp))
-        AxText("Add host", size = 15.sp, color = Color(0xFF8FC3D6))
+        AxText("Add host with a form", size = 15.sp, color = Color(0xFF8FC3D6))
     }
 }
 

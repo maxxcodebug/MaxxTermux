@@ -1,9 +1,16 @@
 package com.maxxcodebug.maxxtermux.design
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -16,11 +23,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -77,15 +85,14 @@ fun AxIcon(
 
 enum class AxTab(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Rounded.Home),
-    Shell("Shell", Icons.Rounded.Terminal),
+    Shell("Terminal", Icons.Rounded.Terminal),
     Keys("Keys", Icons.Rounded.Key),
-    Snippets("Snippets", Icons.Rounded.Code),
+    Settings("Settings", Icons.Rounded.Settings),
 }
 
 /**
- * Floating glass dock: nav pill plus a detached round action button.
- * Glass is a translucent fill with a light edge for now. Real backdrop blur
- * (RenderEffect, Android 12+) is a later step.
+ * Floating glass dock: nav pill plus a detached round button (new terminal tab).
+ * Glass is a translucent fill with a light edge. Real backdrop blur comes later.
  */
 @Composable
 fun AxGlassDock(
@@ -113,18 +120,30 @@ fun AxGlassDock(
         ) {
             AxTab.entries.forEach { tab ->
                 val isSelected = tab == selected
+                val bg by animateColorAsState(
+                    targetValue = if (isSelected) AxColors.GlassSelected else Color.Transparent,
+                    animationSpec = tween(260),
+                    label = "tab-bg",
+                )
                 Row(
                     modifier = Modifier
+                        .axClickable { onSelect(tab) }
                         .clip(AxShapes.Pill)
-                        .then(if (isSelected) Modifier.background(AxColors.GlassSelected) else Modifier)
-                        .clickable { onSelect(tab) }
+                        .background(bg)
+                        .animateContentSize()
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     AxIcon(tab.icon, tint = AxColors.OnTeal, size = 22.dp)
-                    if (isSelected) {
-                        Spacer(Modifier.width(6.dp))
-                        AxText(tab.label, size = 14.sp, color = AxColors.OnTeal, weight = FontWeight.Medium)
+                    AnimatedVisibility(
+                        visible = isSelected,
+                        enter = fadeIn(tween(200)) + expandHorizontally(),
+                        exit = fadeOut(tween(120)) + shrinkHorizontally(),
+                    ) {
+                        Row {
+                            Spacer(Modifier.width(6.dp))
+                            AxText(tab.label, size = 14.sp, color = AxColors.OnTeal, weight = FontWeight.Medium, maxLines = 1)
+                        }
                     }
                 }
             }
@@ -132,10 +151,10 @@ fun AxGlassDock(
         Box(
             modifier = Modifier
                 .size(58.dp)
+                .axClickable { onFab() }
                 .clip(CircleShape)
                 .background(AxColors.GlassAccent)
-                .border(0.5.dp, AxColors.GlassEdge, CircleShape)
-                .clickable { onFab() },
+                .border(0.5.dp, AxColors.GlassEdge, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             AxIcon(Icons.Rounded.Add, tint = AxColors.OnTeal, size = 26.dp)

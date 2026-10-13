@@ -28,6 +28,20 @@ class HostStore(private val ctx: Context) {
         }
     }
 
+    // ---- settings (name, progress style, ...) ----
+    fun loadSettings(): JSONObject {
+        val txt = read("settings.json") ?: return JSONObject()
+        return try {
+            JSONObject(txt)
+        } catch (e: Exception) {
+            JSONObject()
+        }
+    }
+
+    fun saveSettings(o: JSONObject) {
+        write("settings.json", o.toString())
+    }
+
     // ---- hosts ----
     fun loadHosts(): List<Host> {
         val txt = read("hosts.json") ?: return emptyList()
