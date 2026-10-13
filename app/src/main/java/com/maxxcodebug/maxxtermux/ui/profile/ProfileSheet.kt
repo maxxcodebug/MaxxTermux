@@ -78,7 +78,7 @@ fun ProfileSheet() {
             Spacer(Modifier.height(14.dp))
             AxButton(
                 if (first) "Continue" else "Save",
-                onClick = { AppState.setUserName(name) },
+                onClick = { AppState.saveUserName(name) },
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(8.dp))

@@ -66,7 +66,7 @@ fun SettingsScreen() {
             Spacer(Modifier.height(10.dp))
             AxField("Your name", name, { name = it })
             Spacer(Modifier.height(10.dp))
-            AxButton("Save name", onClick = { AppState.setUserName(name) }, modifier = Modifier.fillMaxWidth())
+            AxButton("Save name", onClick = { AppState.saveUserName(name) }, modifier = Modifier.fillMaxWidth())
         }
 
         Spacer(Modifier.height(16.dp))

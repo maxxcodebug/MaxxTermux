@@ -92,7 +92,7 @@ object AppState {
         return parts.take(2).joinToString("") { it.substring(0, 1).uppercase() }
     }
 
-    fun setUserName(name: String) {
+    fun saveUserName(name: String) {
         userName = name.trim()
         profileOpen = false
         persistSettings()
