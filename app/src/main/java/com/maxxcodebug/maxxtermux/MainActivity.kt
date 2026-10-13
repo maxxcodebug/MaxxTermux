@@ -26,7 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.maxxcodebug.maxxtermux.design.AxColors
-import com.maxxcodebug.maxxtermux.design.AxGlassDock
+import com.maxxcodebug.maxxtermux.design.AxLiquidDock
 import com.maxxcodebug.maxxtermux.design.AxTab
 import com.maxxcodebug.maxxtermux.notify.BuildNotifier
 import com.maxxcodebug.maxxtermux.state.AppState
@@ -89,7 +89,7 @@ class MainActivity : ComponentActivity() {
                     enter = slideInVertically(tween(280)) { it } + fadeIn(),
                     exit = slideOutVertically(tween(200)) { it } + fadeOut(),
                 ) {
-                    AxGlassDock(
+                    AxLiquidDock(
                         selected = when (screen) {
                             Screen.Shell -> AxTab.Shell
                             Screen.Keys -> AxTab.Keys

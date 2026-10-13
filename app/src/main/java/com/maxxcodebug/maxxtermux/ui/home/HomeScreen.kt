@@ -1,6 +1,7 @@
 package com.maxxcodebug.maxxtermux.ui.home
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,9 +40,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.maxxcodebug.maxxtermux.R
 import com.maxxcodebug.maxxtermux.build.BuildTracker
 import com.maxxcodebug.maxxtermux.design.AxButton
 import com.maxxcodebug.maxxtermux.design.AxButtonKind
@@ -96,10 +99,18 @@ fun HomeScreen() {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Column {
-                    AxText("MaxxTermux", size = 28.sp, weight = FontWeight.Medium)
-                    if (AppState.userName.isNotBlank()) {
-                        AxText("Hi, ${AppState.userName}", size = 13.sp, color = AxColors.OnMuted)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(R.drawable.ic_logo),
+                        contentDescription = "MaxxTermux logo",
+                        modifier = Modifier.size(46.dp),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        AxText("MaxxTermux", size = 26.sp, weight = FontWeight.Medium)
+                        if (AppState.userName.isNotBlank()) {
+                            AxText("Hi, ${AppState.userName}", size = 13.sp, color = AxColors.OnMuted)
+                        }
                     }
                 }
                 Box(
